@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "morfoskop"
+version = "0.1.0"
+description = "Inflectional paradigm productivity and domain specificity for Polish text"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "spacy>=3.7",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
+
+[project.scripts]
+morfoskop = "morfoskop.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
