@@ -1,86 +1,46 @@
 # morfoskop
 
-A tool for measuring **inflectional paradigm productivity** and **domain
-specificity** in Polish text — built as a deliberate alternative to the
-StyloMetrix approach (Okulska et al., 2023, NASK), not a clone of it.
+Measures two things in Polish text: how flexibly a word is actually inflected, and which words are unusually characteristic of a given domain.
+
+## The idea in one paragraph
+
+Take the word "matka" (mother). If a text uses it ten times and every single time it's "matki" (genitive), that word is doing one job over and over. If a text uses "matka" across five different cases — "matka", "matce", "matkę", "matką", "matki" — the same lemma is doing five jobs. Same word, same frequency, completely different behavior. `morfoskop` measures the second thing. Most tools measure the first.
 
 ## How this differs from StyloMetrix
 
-StyloMetrix counts **morphological feature frequency per token**: how many
-times `Case=Gen` occurred in the text, how many times `Aspect=Perf`,
-normalized by document length. That is a measure of **distributional
-typicality** — it tells you how closely a text matches the average form
-distribution in a reference corpus. It says nothing about whether a lexeme
-is used *generatively* — whether the author actually moves across the
-paradigm, or just repeats the same form over and over.
+StyloMetrix (Okulska et al., 2023, NASK) counts **morphological feature frequency per token**: how many times `Case=Gen` shows up in the text, how many times `Aspect=Perf`, normalized by document length. That's a measure of **distributional typicality** — how closely a text matches the average form distribution of a reference corpus. It tells you nothing about whether a given lexeme is used *generatively*, i.e. whether the author is actually moving across the paradigm or just repeating one form.
 
-`morfoskop` counts differently: **per lemma, not per token**. For each
-lemma it checks how many *distinct* paradigm cells were attested in the
-text, and how evenly usage is distributed across them (entropy). Two texts
-can have identical `Case=Gen` frequency under StyloMetrix and completely
-different paradigm productivity under `morfoskop` — one might inflect the
-same noun across five cases, the other might repeat the genitive of one
-different word ten times.
+`morfoskop` counts **per lemma, not per token**. For each lemma, it checks how many *distinct* paradigm cells were attested, and how evenly usage is spread across them (entropy). Two texts can have identical `Case=Gen` frequency under StyloMetrix and completely different paradigm productivity under `morfoskop`.
 
-Second difference: `morfoskop` does not mix two annotation systems within
-one category. StyloMetrix's Polish inflection module sometimes reads
-`token.morph` and sometimes falls back to the old positional tagset via
-`token.tag_` (see `IN_V_FUTS`, `IN_V_IMP`, `IN_V_COND` in their repo). Here
-everything goes through `token.morph` (Universal Dependencies), consistently.
+Second, unrelated difference: `morfoskop` reads grammatical annotation through one consistent system (`token.morph`, Universal Dependencies) end to end. StyloMetrix's Polish inflection module mixes two annotation systems within the same category — `token.morph` in most places, the older positional tagset via `token.tag_` elsewhere (see `IN_V_FUTS`, `IN_V_IMP`, `IN_V_COND` in their repo). That inconsistency is avoided here by design, not by accident.
+
+This tool grew out of that comparison — it's a separate methodology built to ask a different question, not a StyloMetrix fork or extension.
 
 ## Two modules
 
-### 1. `paradigm_productivity` — paradigm productivity
+### 1. `paradigm_productivity`
 
-For nouns and adjectives: the set of attested cases per lemma, Shannon
-entropy of the case-usage distribution, coverage ratio against the
-7-member set of Polish cases (Nom, Gen, Dat, Acc, Ins, Loc, Voc).
+For nouns and adjectives: which grammatical cases were attested per lemma, out of the 7-member Polish case set (Nom, Gen, Dat, Acc, Ins, Loc, Voc), plus Shannon entropy of how evenly usage is spread across those cases.
 
-For verbs: the set of attested (aspect, tense, mood) combinations per
-lemma, same entropy logic.
+For verbs: same logic, over attested (aspect, tense, mood) combinations.
 
-Theoretical grounding: this is not an ad hoc invention — it draws on the
-**Paradigm Cell Filling Problem** and the **Low Conditional Entropy
-Conjecture** (Ackerman & Malouf, 2013, *Language*), and on Baayen's (1992)
-morphological productivity measures (type/token ratio as an estimator of
-productivity). Entropy of form distribution as an indicator of paradigm
-"health" is a standard tool in that literature, not an original shortcut.
+Grounded in the **Paradigm Cell Filling Problem** and the **Low Conditional Entropy Conjecture** (Ackerman & Malouf, 2013, *Language*), and in Baayen's (1992) morphological productivity measures. Entropy of form distribution as an indicator of paradigm health is standard in that literature — not invented for this tool.
 
-### 2. `domain_specificity` — domain specificity (specialist vocabulary)
+**A note on the entropy numbers you'll see:** plain Shannon entropy computed from raw counts is biased *downward* when a lemma has few examples — the fewer tokens you have, the more "unproductive" a word looks, even when it isn't. This is a known statistical artifact, not a linguistic finding. Practical rule: always report the token count (N) next to every entropy value, and treat anything below N=30 per lemma as low-confidence rather than putting it in the same table as well-sampled lemmas. If you need something more rigorous than a threshold, the Chao-Shen coverage-adjusted estimator (Chao & Shen, 2003) corrects for probability mass sitting in paradigm cells that exist but weren't observed in the sample — worth implementing if you're publishing comparisons across lemmas with very different frequencies.
 
-Does not require a terminology dictionary (which barely exists for Polish
-specialist domains anyway — already documented in the NSM/frequency-resource
-notes). Instead: comparison of lemma frequency between a target corpus and
-a reference corpus, classic **log-likelihood ratio / keyness** (Dunning,
-1993; Rayson & Garside, 2000). A word that is rare overall but frequent in
-the domain corpus signals specificity — no pre-existing term list required.
-Works with any reference corpus — naturally plugs into Bielikans/SpeakLeash
-as a general-Polish reference.
+### 2. `domain_specificity`
 
-## What this tool does NOT do
+Compares lemma frequency between a target corpus and a reference corpus — classic log-likelihood ratio / keyness (Dunning, 1993; Rayson & Garside, 2000). A word that's rare overall but frequent in the target corpus signals domain specificity. No terminology dictionary needed (dedicated Polish domain-term lists barely exist anyway). Any reference corpus works — plugs naturally into Bielikans/SpeakLeash as a general-Polish baseline.
 
-- It does not tokenize at the subword/BPE level. It operates on the layer
-  after spaCy tokenization — the entire BPE/tokenizer layer stays a separate
-  thread (preprints 1–4), deliberately unconnected here.
-- It does not reproduce or expose the doctoral sequential method. The
-  measures here are general, published morphological literature — not
-  unpublished know-how.
-- It is not a ready-made "quality" classifier for text. It returns
-  descriptive numbers; interpreting quality thresholds is a separate,
-  deliberate decision, not something quietly baked in the way it is in
-  the Bielik quality classifier.
+## Scope
+
+Operates on the layer after spaCy tokenization — word-level morphology. Subword/BPE tokenization is a separate line of work (see preprints 1–4) and stays out of this tool on purpose.
+
+Output is descriptive: entropy values, coverage ratios, keyness scores, with N reported alongside. Deciding what counts as a "good" or "bad" score for your use case is a separate step you make explicitly, not something the tool decides for you.
 
 ## Morphological backend
 
-Defaults to `pl_core_news_lg` (spaCy). **Note**: `pl_core_news_sm` has a
-weak lemmatizer — in testing it confused "kota" (genitive singular of
-"kot") with a separate lemma "kota", and lemmatized "macie" (locative
-singular of "mata") as "mieć". A live end-to-end run on `sm` also failed
-to merge capitalized sentence-initial "Psa" with the lemma "pies",
-producing a spurious separate lemma with zero measured entropy — this is
-a confirmed, reproduced failure mode, not a hypothetical one. Use `lg` for
-research work; ideally `pl_nask` (HerBERT-based, IPI PAN) if available —
-the backend is swappable, see `pipeline.py`.
+Defaults to `pl_core_news_lg` (spaCy). `pl_core_news_sm` has a weak lemmatizer — confirmed failures include merging "kota" (genitive of "kot") into a separate lemma, lemmatizing "macie" (locative of "mata") as "mieć", and failing to merge capitalized sentence-initial "Psa" with lemma "pies" (producing a spurious lemma with zero measured entropy). These are reproduced, not hypothetical. Use `lg` for real work; `pl_nask` (HerBERT-based, IPI PAN) if available — backend is swappable, see `pipeline.py`.
 
 ## Installation
 
@@ -96,10 +56,10 @@ morfoskop paradigm --input text.txt
 morfoskop keyness --target domain/ --reference general/
 ```
 
-or programmatically — see `examples/demo.py`.
+Programmatic use: see `examples/demo.py`.
 
 ## Status
 
-Working skeleton. Verb metrics (aspect/tense/mood combinations) are
-simplified relative to the full complexity of the Polish verbal system —
-to be extended after first tests on a real corpus.
+Working skeleton. Verb metrics (aspect/tense/mood combinations) are simplified relative to the full complexity of the Polish verbal system — to be extended after first tests on a real corpus.
+
+Current version measures paradigm productivity via lemma + grammatical tag (spaCy's `token.morph`) — entropy over attested case/tense labels per lemma. A finer-grained metric is in development: segmentation into root, prefix, and inflectional ending, to measure productivity at the level of word structure itself rather than the grammatical label spaCy assigns to it.
