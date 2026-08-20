@@ -1,4 +1,4 @@
-Methodology
+#Methodology
 Known limitation, empirically verified (not hypothetical)
 
 Running examples/demo.py on pl_core_news_sm revealed a lemmatization error identical in kind to the one found on first contact with the StyloMetrix repo ("Kota" → lemma "kota" instead of "kot"): in the GENERATIVE text, the capitalized sentence-initial form "Psa" was not merged with the lemma "pies" — a separate, spurious lemma "psa" was created with distinct_cells=1. This deflates the measured productivity for "pies" and is a hard argument against using sm for research work. To verify: whether pl_core_news_lg has the same problem, or only the small variant. Recommended next step: rerun the demo on lg and, eventually, on pl_nask.
